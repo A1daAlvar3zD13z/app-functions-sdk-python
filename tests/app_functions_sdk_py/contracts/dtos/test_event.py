@@ -5,7 +5,10 @@ import unittest
 
 from src.app_functions_sdk_py.contracts.common.constants import API_VERSION
 from src.app_functions_sdk_py.contracts.dtos.event import Event
-from src.app_functions_sdk_py.contracts.dtos.reading import BaseReading, new_base_reading
+from src.app_functions_sdk_py.contracts.dtos.reading import (
+    BaseReading,
+    new_base_reading,
+)
 from src.app_functions_sdk_py.contracts.dtos.tags import Tags
 
 TestEventId = "TestEvent"
@@ -30,10 +33,23 @@ class TestEvent(unittest.TestCase):
             profileName=TestProfileName,
             sourceName=TestSourceName,
             origin=TestOrigin,
-            readings=[BaseReading(TestReadingId, time.time_ns(), TestDeviceName, TestResourceName,
-                                  TestProfileName, "TestValueType", "TestUnits", "TestValue",
-                                  TestTags, objectValue=None, tags=None, mediaType="")],
-            tags=TestTags
+            readings=[
+                BaseReading(
+                    TestReadingId,
+                    time.time_ns(),
+                    TestDeviceName,
+                    TestResourceName,
+                    TestProfileName,
+                    "TestValueType",
+                    "TestUnits",
+                    "TestValue",
+                    TestTags,
+                    objectValue=None,
+                    tags=None,
+                    mediaType="",
+                )
+            ],
+            tags=TestTags,
         )
 
     def test_event_creation(self):
@@ -46,7 +62,9 @@ class TestEvent(unittest.TestCase):
         self.assertIsInstance(self.event.tags, dict)
 
     def test_event_to_xml(self):
-        reading = new_base_reading(TestProfileName, TestDeviceName, TestSourceName, TestValueType, "123")
+        reading = new_base_reading(
+            TestProfileName, TestDeviceName, TestSourceName, TestValueType, "123"
+        )
         reading.Tags = {"1": TestTag1, "2": TestTag2}
         reading.origin = TestOrigin
         reading.id = TestUUID
@@ -68,7 +86,8 @@ class TestEvent(unittest.TestCase):
         contains = [
             "<Event>",
             "<Id>7a1707f0-166f-4c4b-bc9d-1d54c74e0137</Id><DeviceName>TestDevice</DeviceName>",
-            "<ProfileName>TestProfile</ProfileName><SourceName>TestSource</SourceName>","<Origin>1594963842</Origin>",
+            "<ProfileName>TestProfile</ProfileName><SourceName>TestSource</SourceName>",
+            "<Origin>1594963842</Origin>",
             "<Tags><GatewayID>Houston-0001</GatewayID><Latitude>29.630771</Latitude>",
             "<Longitude>-95.377603</Longitude></Tags>",
             "<Readings>",
@@ -87,5 +106,5 @@ class TestEvent(unittest.TestCase):
             self.assertTrue(item in actual, f"Missing item '{item}'")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

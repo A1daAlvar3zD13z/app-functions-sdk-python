@@ -17,7 +17,9 @@ from .interfaces import ApplicationService
 from .internal.app.service import Service
 
 
-def new_app_service(service_key: str, target_type: Any = None) -> (ApplicationService, bool):
+def new_app_service(
+    service_key: str, target_type: Any = None
+) -> (ApplicationService, bool):
     """
     Creates a new ApplicationService instance and initializes it.
 
@@ -34,7 +36,9 @@ def new_app_service(service_key: str, target_type: Any = None) -> (ApplicationSe
         tuple: A tuple containing the new ApplicationService instance (or None if initialization
         failed) and a boolean indicating whether the initialization was successful.
     """
-    service = Service(service_key, target_type, constants.DEFAULT_PROFILE_SUFFIX_PLACEHOLDER)
+    service = Service(
+        service_key, target_type, constants.DEFAULT_PROFILE_SUFFIX_PLACEHOLDER
+    )
     try:
         service.initialize()
         return service, True

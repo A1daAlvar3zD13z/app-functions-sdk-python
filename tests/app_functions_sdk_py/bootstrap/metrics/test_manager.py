@@ -39,25 +39,27 @@ class TestMessageBusReporter(unittest.TestCase):
         name = "my-metric"
 
         class TestData:
-            def __init__(self, case_name: str, target_type: Any, wrong_type: Any, expected: Any):
+            def __init__(
+                self, case_name: str, target_type: Any, wrong_type: Any, expected: Any
+            ):
                 self.name = case_name
                 self.target_type = target_type
                 self.wrong_type = wrong_type
                 self.expected = expected
 
         test_cases = [
-            TestData("Happy path Counter", Counter(""), None, Counter("")),
-            TestData("Not registered Counter", Counter(""), None, None),
-            TestData("Wrong type Counter", Counter(""), Gauge(""), None),
-            TestData("Happy path Gauge", Gauge(""), None, Gauge("")),
-            TestData("Not registered Gauge", Gauge(""), None, None),
-            TestData("Wrong type Gauge", Gauge(""), Counter(""), None),
-            TestData("Happy path GaugeFloat64", GaugeFloat64(""), None, GaugeFloat64("")),
-            TestData("Not registered GaugeFloat64", GaugeFloat64(""), None, None),
-            TestData("Wrong type GaugeFloat64", GaugeFloat64(""), Counter(""), None),
-            TestData("Happy path Timer", Timer(""), None, Timer("")),
-            TestData("Not registered Timer", Timer(""), None, None),
-            TestData("Wrong type Timer", Timer(""), Counter(""), None),
+            TestData("Happy path Counter", Counter(), None, Counter()),
+            TestData("Not registered Counter", Counter(), None, None),
+            TestData("Wrong type Counter", Counter(), Gauge(), None),
+            TestData("Happy path Gauge", Gauge(), None, Gauge()),
+            TestData("Not registered Gauge", Gauge(), None, None),
+            TestData("Wrong type Gauge", Gauge(), Counter(), None),
+            TestData("Happy path GaugeFloat64", GaugeFloat64(), None, GaugeFloat64()),
+            TestData("Not registered GaugeFloat64", GaugeFloat64(), None, None),
+            TestData("Wrong type GaugeFloat64", GaugeFloat64(), Counter(), None),
+            TestData("Happy path Timer", Timer(), None, Timer()),
+            TestData("Not registered Timer", Timer(), None, None),
+            TestData("Wrong type Timer", Timer(), Counter(), None),
         ]
 
         for test in test_cases:
@@ -85,7 +87,7 @@ class TestMessageBusReporter(unittest.TestCase):
         expected_tags = {"my-tag": "my-value"}
         m = Manager(Mock(), timedelta(seconds=5), Mock())
 
-        expected_metric = Counter("")
+        expected_metric = Counter()
         m.register(expected_name, expected_metric, expected_tags)
 
         self.assertEqual(expected_metric, m._registry.get_metric(expected_name))
@@ -100,18 +102,20 @@ class TestMessageBusReporter(unittest.TestCase):
 
         # Invalid metric name
         with self.assertRaises(errors.EdgeX):
-            m.register("  ", Counter(""), None)
+            m.register("  ", Counter(), None)
 
         # Invalid Tag name
         with self.assertRaises(errors.EdgeX):
-            m.register("my-counter", Counter(""), {"  ": "value"})
+            m.register("my-counter", Counter(), {"  ": "value"})
 
         # Duplicate error
-        m.register("my-counter", Counter(""), None)
+        m.register("my-counter", Counter(), None)
         with self.assertRaises(errors.EdgeX):
-            m.register("my-counter", Counter(""), None)
+            m.register("my-counter", Counter(), None)
 
-    @patch("src.app_functions_sdk_py.bootstrap.metrics.reporter.MessageBusReporter.report")
+    @patch(
+        "src.app_functions_sdk_py.bootstrap.metrics.reporter.MessageBusReporter.report"
+    )
     def test_manager_run(self, mock_report):
         reporter = MessageBusReporter(Mock(), "", "", Mock(), Mock())
 
@@ -142,6 +146,7 @@ class TestMessageBusReporter(unittest.TestCase):
 
         def report_side_effect(*args, **kwargs):
             raise errors.new_common_edgex(errors.ErrKind.SERVER_ERROR, "test error")
+
         mock_reporter.report.side_effect = report_side_effect
 
         ctx_down = Event()
@@ -171,5 +176,5 @@ class TestMessageBusReporter(unittest.TestCase):
         self.assertEqual(expected, m._interval)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

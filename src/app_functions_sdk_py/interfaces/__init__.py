@@ -62,7 +62,7 @@ class AppFunctionContext(ABC):
     """
 
     @abstractmethod
-    def clone(self) -> 'AppFunctionContext':
+    def clone(self) -> "AppFunctionContext":
         """
         Clones the context.
 
@@ -167,7 +167,7 @@ class AppFunctionContext(ABC):
         """
 
     @abstractmethod
-    def logger(self) -> 'Logger':
+    def logger(self) -> "Logger":
         """
         Gets the logger.
 
@@ -221,7 +221,9 @@ class AppFunctionContext(ABC):
         """
 
     @abstractmethod
-    def get_device_resource(self, device_name: str, resource_name: str) -> DeviceResource:
+    def get_device_resource(
+        self, device_name: str, resource_name: str
+    ) -> DeviceResource:
         """
         get_device_resource retrieves the DeviceResource for given profileName and resourceName
         """
@@ -329,7 +331,7 @@ def payload_with_correct_content_type(envelope: MessageEnvelope) -> MessageEnvel
     """
     Ensures the payload has the correct content type.
     """
-    content_type = envelope.contentType.split(';')[0]
+    content_type = envelope.contentType.split(";")[0]
     copy_envelope = deepcopy(envelope)
     copy_envelope.contentType = content_type
     return copy_envelope
@@ -344,14 +346,15 @@ class FunctionPipeline:  # pylint: disable=too-few-public-methods
         topics (List[str]): A list of topics associated with the pipeline.
         transforms (List[AppFunction]): A list of functions to be executed in the pipeline.
     """
+
     def __init__(self, pipelineid: str, topics: List[str], *transforms: AppFunction):
         self.id = pipelineid
         self.transforms = transforms
         self.topics = topics
         self.hash = calculate_pipeline_hash(*transforms)
-        self.message_processed = meters.Counter("")
-        self.message_processing_time = meters.Timer("")
-        self.processing_errors = meters.Counter("")
+        self.message_processed = meters.Counter()
+        self.message_processing_time = meters.Timer()
+        self.processing_errors = meters.Counter()
 
 
 class Trigger(ABC):  # pylint: disable=too-few-public-methods
@@ -366,7 +369,9 @@ class Trigger(ABC):  # pylint: disable=too-few-public-methods
     """
 
     @abstractmethod
-    def initialize(self, ctx_done: threading.Event, app_wg: WaitGroup) -> Optional[Deferred]:
+    def initialize(
+        self, ctx_done: threading.Event, app_wg: WaitGroup
+    ) -> Optional[Deferred]:
         """
         initializes the trigger.
 
@@ -421,9 +426,14 @@ class TriggerConfig:
         config_loader (TriggerConfigLoader): A function that can be used to load custom
         configuration sections for the trigger.
     """
-    def __init__(self, logger: Logger, context_builder: TriggerContextBuilder,
-                 message_received: TriggerMessageHandler,
-                 config_loader: TriggerConfigLoader):
+
+    def __init__(
+        self,
+        logger: Logger,
+        context_builder: TriggerContextBuilder,
+        message_received: TriggerMessageHandler,
+        config_loader: TriggerConfigLoader,
+    ):
         self.logger = logger
         self.context_builder = context_builder
         self.message_received = message_received
@@ -447,8 +457,13 @@ class ApplicationService(ABC):
         """
 
     @abstractmethod
-    def add_custom_route(self, route: str, use_auth: bool, handler: Callable,
-                         methods: Optional[List[str]] = None):
+    def add_custom_route(
+        self,
+        route: str,
+        use_auth: bool,
+        handler: Callable,
+        methods: Optional[List[str]] = None,
+    ):
         """
         Adds a custom route.
 
@@ -511,10 +526,9 @@ class ApplicationService(ABC):
         """
 
     @abstractmethod
-    def add_functions_pipeline_for_topics(self,
-                                          pipeline_id: str,
-                                          topics: List[str],
-                                          functions: List[AppFunction]):
+    def add_functions_pipeline_for_topics(
+        self, pipeline_id: str, topics: List[str], functions: List[AppFunction]
+    ):
         """
         Adds a functions pipeline for topics.
 
@@ -550,8 +564,9 @@ class ApplicationService(ABC):
         """
 
     @abstractmethod
-    def register_custom_trigger_factory(self, name: str,
-                                        factory: Callable[[TriggerConfig], Trigger]):
+    def register_custom_trigger_factory(
+        self, name: str, factory: Callable[[TriggerConfig], Trigger]
+    ):
         """
         register_custom_trigger_factory allows users to register builders for custom trigger types
         """
@@ -629,8 +644,9 @@ class ApplicationService(ABC):
         """
 
     @abstractmethod
-    def listen_for_custom_config_changes(self, config: Any, section_name: str,
-                                         changed_callback: Callable[[Any], None]):
+    def listen_for_custom_config_changes(
+        self, config: Any, section_name: str, changed_callback: Callable[[Any], None]
+    ):
         """
         listen_for_custom_config_changes listens for configuration changes for the specified
         configuration section. When a change is detected, the callback function is invoked with

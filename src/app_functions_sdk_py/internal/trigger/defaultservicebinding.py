@@ -66,10 +66,11 @@ class DefaultTriggerServiceBinding(ServiceBinding):
         build_context: Builds the context for the trigger.
         get_matching_pipelines: Retrieves the pipelines that match the incoming topic.
     """
+
     # pylint: disable=too-many-arguments
-    def __init__(self,
-                 pipeline_runtime: FunctionsPipelineRuntime,
-                 svc: ApplicationService):
+    def __init__(
+        self, pipeline_runtime: FunctionsPipelineRuntime, svc: ApplicationService
+    ):
         self._runtime = pipeline_runtime
         self._svc = svc
 
@@ -79,7 +80,9 @@ class DefaultTriggerServiceBinding(ServiceBinding):
         """
         return self._runtime.decode_message(ctx, envelope)
 
-    def process_message(self, ctx: AppFunctionContext, data: Any, pipeline: FunctionPipeline):
+    def process_message(
+        self, ctx: AppFunctionContext, data: Any, pipeline: FunctionPipeline
+    ):
         """
         provides access to the runtime's ProcessMessage function to process the
         decoded data
@@ -151,32 +154,52 @@ class DefaultTriggerMessageProcessor(MessageProcessor):
         received_invalid_message: Handles the event when an invalid message is received, allowing
                                   for metrics counter increment.
     """
-    def __init__(self, service_binding: ServiceBinding, metrics_manager: MetricsManager):
+
+    def __init__(
+        self, service_binding: ServiceBinding, metrics_manager: MetricsManager
+    ):
         self.service_binding = service_binding
-        self.messages_received = meters.Counter("")
-        self.invalid_messages_received = meters.Counter("")
+        self.messages_received = meters.Counter()
+        self.invalid_messages_received = meters.Counter()
 
         lc = service_binding.logger()
 
         try:
-            metrics_manager.register(MESSAGES_RECEIVED_NAME, self.messages_received, None)
-            lc.info("%s metric has been registered and will be reported", MESSAGES_RECEIVED_NAME)
+            metrics_manager.register(
+                MESSAGES_RECEIVED_NAME, self.messages_received, None
+            )
+            lc.info(
+                "%s metric has been registered and will be reported",
+                MESSAGES_RECEIVED_NAME,
+            )
         except errors.EdgeX as e:
-            lc.warn("%s metric failed to register and will not be reported: %s",
-                    MESSAGES_RECEIVED_NAME, e)
+            lc.warn(
+                "%s metric failed to register and will not be reported: %s",
+                MESSAGES_RECEIVED_NAME,
+                e,
+            )
 
         try:
-            metrics_manager.register(INVALID_MESSAGES_RECEIVED_NAME,
-                                     self.invalid_messages_received, None)
-            lc.info("%s metric has been registered and will be reported (if enabled)",
-                    INVALID_MESSAGES_RECEIVED_NAME)
+            metrics_manager.register(
+                INVALID_MESSAGES_RECEIVED_NAME, self.invalid_messages_received, None
+            )
+            lc.info(
+                "%s metric has been registered and will be reported (if enabled)",
+                INVALID_MESSAGES_RECEIVED_NAME,
+            )
         except errors.EdgeX as e:
-            lc.warn("%s metric failed to register and will not be reported: %s",
-                    INVALID_MESSAGES_RECEIVED_NAME, e)
+            lc.warn(
+                "%s metric failed to register and will not be reported: %s",
+                INVALID_MESSAGES_RECEIVED_NAME,
+                e,
+            )
 
-    def message_received(self, ctx: AppFunctionContext,
-                         envelope: MessageEnvelope,
-                         output_handler: PipelineResponseHandler):
+    def message_received(
+        self,
+        ctx: AppFunctionContext,
+        envelope: MessageEnvelope,
+        output_handler: PipelineResponseHandler,
+    ):
         """
         message_received provides runtime orchestration to pass the envelope to configured
         pipeline(s)
@@ -184,34 +207,46 @@ class DefaultTriggerMessageProcessor(MessageProcessor):
         self.messages_received.inc(1)
         # pylint: disable=broad-exception-caught
         lc = self.service_binding.logger()
-        lc.debug(f"trigger attempting to find pipeline(s) for topic '{envelope.receivedTopic}'")
+        lc.debug(
+            f"trigger attempting to find pipeline(s) for topic '{envelope.receivedTopic}'"
+        )
         if not isinstance(ctx, Context):
             ctx = self.service_binding.build_context(envelope)
 
         pipelines = self.service_binding.get_matching_pipelines(envelope.receivedTopic)
-        lc.debug(f"trigger found {len(pipelines)} pipeline(s) that match the incoming topic "
-                 f"'{envelope.receivedTopic}'")
+        lc.debug(
+            f"trigger found {len(pipelines)} pipeline(s) that match the incoming topic "
+            f"'{envelope.receivedTopic}'"
+        )
         if not pipelines:
             return
 
-        def pipeline_process_message(function_pipeline: FunctionPipeline,
-                                     wait_group: WaitGroup,
-                                     data: Any):
+        def pipeline_process_message(
+            function_pipeline: FunctionPipeline, wait_group: WaitGroup, data: Any
+        ):
             with function_pipeline.message_processing_time.time():
-                lc.debug(f"trigger sending message to pipeline {function_pipeline.id} for "
-                         f"envelope {envelope.correlationID}")
+                lc.debug(
+                    f"trigger sending message to pipeline {function_pipeline.id} for "
+                    f"envelope {envelope.correlationID}"
+                )
                 try:
-                    self.service_binding.process_message(ctx.clone(), data, function_pipeline)
+                    self.service_binding.process_message(
+                        ctx.clone(), data, function_pipeline
+                    )
                 except Exception as ex:
-                    lc.error(f"error processing message in pipeline {function_pipeline.id} for "
-                             f"envelope {envelope.correlationID}: {ex}")
+                    lc.error(
+                        f"error processing message in pipeline {function_pipeline.id} for "
+                        f"envelope {envelope.correlationID}: {ex}"
+                    )
                 else:
                     if output_handler is not None:
                         try:
                             output_handler(ctx, function_pipeline)
                         except Exception as ex:
-                            lc.error(f"failed to process output for message {ctx.correlation_id()}"
-                                     f" on pipeline {function_pipeline.id} : {ex}")
+                            lc.error(
+                                f"failed to process output for message {ctx.correlation_id()}"
+                                f" on pipeline {function_pipeline.id} : {ex}"
+                            )
                 finally:
                     wait_group.done()
 
@@ -222,8 +257,10 @@ class DefaultTriggerMessageProcessor(MessageProcessor):
             for pipeline in pipelines:
                 pipeline_wg.add(1)
                 pipeline.message_processed.inc(1)
-                threading.Thread(target=pipeline_process_message,
-                                 args=(pipeline, pipeline_wg, target_data)).start()
+                threading.Thread(
+                    target=pipeline_process_message,
+                    args=(pipeline, pipeline_wg, target_data),
+                ).start()
         except Exception as e:
             self.invalid_messages_received.inc(1)
             lc.error(f"failed to decode message: {e}")

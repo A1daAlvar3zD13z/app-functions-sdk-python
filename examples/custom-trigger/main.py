@@ -8,8 +8,14 @@ from typing import Optional, Any, Tuple
 from app_functions_sdk_py.factory import new_app_service
 
 from app_functions_sdk_py.constants import TARGET_TYPE_BYTES
-from app_functions_sdk_py.interfaces import TriggerConfig, Trigger, Deferred, AppFunctionContext, FunctionPipeline, \
-    MessageEnvelope
+from app_functions_sdk_py.interfaces import (
+    TriggerConfig,
+    Trigger,
+    Deferred,
+    AppFunctionContext,
+    FunctionPipeline,
+    MessageEnvelope,
+)
 from app_functions_sdk_py.sync.waitgroup import WaitGroup
 from app_functions_sdk_py.utils.helper import coerce_type
 
@@ -18,16 +24,19 @@ class CustomTrigger(Trigger):
     def __init__(self, tc: TriggerConfig):
         self.tc = tc
 
-    def initialize(self, ctx_done: threading.Event, app_wg: WaitGroup,
-                   background_publish_queue: Queue) -> Optional[Deferred]:
+    def initialize(
+        self,
+        ctx_done: threading.Event,
+        app_wg: WaitGroup,
+        background_publish_queue: Queue,
+    ) -> Optional[Deferred]:
 
         def loop():
             while not ctx_done.is_set():
                 ctx_done.wait(3)  # wait for 3 seconds
 
                 event = MessageEnvelope(
-                    payload="Hello, World!".encode(),
-                    received_topic="CustomTrigger"
+                    payload="Hello, World!".encode(), received_topic="CustomTrigger"
                 )
 
                 try:
@@ -40,7 +49,9 @@ class CustomTrigger(Trigger):
         return None
 
     def response_handler(self, ctx: AppFunctionContext, pipeline: FunctionPipeline):
-        self.tc.logger.info("Responding to pipeline %s with '%s'", pipeline.id, str(ctx.response_data()))
+        self.tc.logger.info(
+            "Responding to pipeline %s with '%s'", pipeline.id, str(ctx.response_data())
+        )
 
 
 def PrintDataToConsole(app_context: AppFunctionContext, data: Any) -> Tuple[bool, Any]:
@@ -61,10 +72,14 @@ class MyApp:
         self.service_key = "app-new-service"
 
     def create_and_run_service(self):
-        service, result = new_app_service(self.service_key, target_type=TARGET_TYPE_BYTES)
+        service, result = new_app_service(
+            self.service_key, target_type=TARGET_TYPE_BYTES
+        )
         print(f"service: {service}, result: {result}")
         if not result:
-            raise RuntimeError("failed to create a new ApplicationService instance and initialize it.")
+            raise RuntimeError(
+                "failed to create a new ApplicationService instance and initialize it."
+            )
 
         def trigger_factory(tc: TriggerConfig) -> Trigger:
             return CustomTrigger(tc)

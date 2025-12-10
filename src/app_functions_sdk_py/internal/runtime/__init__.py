@@ -17,27 +17,49 @@ import isodate
 from isodate import ISO8601Error
 from pyformance.meters import Counter
 
-from ..constants import (PIPELINE_ID_TXT, PIPELINE_MESSAGES_PROCESSED_NAME,
-                         PIPELINE_MESSAGE_PROCESSING_TIME_NAME, PIPELINE_PROCESSING_ERRORS_NAME,
-                         STORE_FORWARD_QUEUE_SIZE_NAME)
+from ..constants import (
+    PIPELINE_ID_TXT,
+    PIPELINE_MESSAGES_PROCESSED_NAME,
+    PIPELINE_MESSAGE_PROCESSING_TIME_NAME,
+    PIPELINE_PROCESSING_ERRORS_NAME,
+    STORE_FORWARD_QUEUE_SIZE_NAME,
+)
 from ...bootstrap.container.configuration import configuration_from
 from ...bootstrap.container.logging import logging_client_from
 from ...bootstrap.container.metrics import metrics_manager_from
 from ...bootstrap.container.store import store_client_from
 from ...bootstrap.di.container import Container
 from ...bootstrap.interface.metrics import MetricsManager
-from ...constants import TOPIC_WILDCARD, TOPIC_SINGLE_LEVEL_WILDCARD, TOPIC_LEVEL_SEPERATOR, \
-    KEY_RECEIVEDTOPIC, KEY_DEVICE_NAME, KEY_PROFILE_NAME, KEY_SOURCE_NAME, KEY_PIPELINEID, \
-    DEFAULT_PIPELINE_ID
+from ...constants import (
+    TOPIC_WILDCARD,
+    TOPIC_SINGLE_LEVEL_WILDCARD,
+    TOPIC_LEVEL_SEPERATOR,
+    KEY_RECEIVEDTOPIC,
+    KEY_DEVICE_NAME,
+    KEY_PROFILE_NAME,
+    KEY_SOURCE_NAME,
+    KEY_PIPELINEID,
+    DEFAULT_PIPELINE_ID,
+)
 from ...contracts import errors
 from ...contracts.common import constants
-from ...contracts.common.constants import CONTENT_TYPE_JSON, CORRELATION_HEADER, VALUE_TRUE, ENV_OPTIMIZE_EVENT_PAYLOAD
+from ...contracts.common.constants import (
+    CONTENT_TYPE_JSON,
+    CORRELATION_HEADER,
+    VALUE_TRUE,
+    ENV_OPTIMIZE_EVENT_PAYLOAD,
+)
 from ...contracts.dtos.event import Event
 from ...contracts.dtos.requests.event import AddEventRequest
 from ...contracts.dtos.store_object import new_stored_object, StoredObject
 from ...functions.context import Context
-from ...interfaces import FunctionPipeline, AppFunctionContext, AppFunction, calculate_pipeline_hash, \
-    payload_with_correct_content_type
+from ...interfaces import (
+    FunctionPipeline,
+    AppFunctionContext,
+    AppFunction,
+    calculate_pipeline_hash,
+    payload_with_correct_content_type,
+)
 from ...interfaces.messaging import MessageEnvelope, get_msg_payload
 from ...sync.waitgroup import WaitGroup
 
@@ -49,6 +71,7 @@ class MessageError:
     """
     MessageError represents an error that occurred during message processing
     """
+
     err: errors.EdgeX
     err_code: int
 
@@ -97,8 +120,10 @@ class FunctionsPipelineRuntime:
         """
         default_pipeline = self._pipelines.get(DEFAULT_PIPELINE_ID)
         if default_pipeline is None:
-            default_pipeline = self._add_function_pipeline(DEFAULT_PIPELINE_ID,
-                                                           [TOPIC_WILDCARD], )
+            default_pipeline = self._add_function_pipeline(
+                DEFAULT_PIPELINE_ID,
+                [TOPIC_WILDCARD],
+            )
         return default_pipeline
 
     def remove_all_function_pipelines(self):
@@ -108,53 +133,75 @@ class FunctionsPipelineRuntime:
         metric_manager = metrics_manager_from(self._dic.get)
         with self.is_busy_copying_lock:
             for pipeline_id, _ in self._pipelines.items():
-                self.unregister_pipeline_metric(metric_manager,
-                                                PIPELINE_MESSAGES_PROCESSED_NAME, pipeline_id)
-                self.unregister_pipeline_metric(metric_manager,
-                                                PIPELINE_MESSAGE_PROCESSING_TIME_NAME, pipeline_id)
-                self.unregister_pipeline_metric(metric_manager,
-                                                PIPELINE_PROCESSING_ERRORS_NAME, pipeline_id)
+                self.unregister_pipeline_metric(
+                    metric_manager, PIPELINE_MESSAGES_PROCESSED_NAME, pipeline_id
+                )
+                self.unregister_pipeline_metric(
+                    metric_manager, PIPELINE_MESSAGE_PROCESSING_TIME_NAME, pipeline_id
+                )
+                self.unregister_pipeline_metric(
+                    metric_manager, PIPELINE_PROCESSING_ERRORS_NAME, pipeline_id
+                )
             self._pipelines.clear()
 
-    def _add_function_pipeline(self, pipeline_id: str, topics: list[str],
-                               *transforms: AppFunction) -> FunctionPipeline:
+    def _add_function_pipeline(
+        self, pipeline_id: str, topics: list[str], *transforms: AppFunction
+    ) -> FunctionPipeline:
         """
         _add_function_pipeline adds a new pipeline to the runtime
         """
         pipeline = FunctionPipeline(pipeline_id, topics, *transforms)
         with self.is_busy_copying_lock:
             self._pipelines[pipeline_id] = pipeline
-
         metric_manager = metrics_manager_from(self._dic.get)
-        self.register_pipeline_metric(metric_manager, PIPELINE_MESSAGES_PROCESSED_NAME,
-                                      pipeline.id, pipeline.message_processed)
-        self.register_pipeline_metric(metric_manager, PIPELINE_MESSAGE_PROCESSING_TIME_NAME,
-                                      pipeline.id, pipeline.message_processing_time)
-        self.register_pipeline_metric(metric_manager, PIPELINE_PROCESSING_ERRORS_NAME,
-                                      pipeline.id, pipeline.processing_errors)
+        self.register_pipeline_metric(
+            metric_manager,
+            PIPELINE_MESSAGES_PROCESSED_NAME,
+            pipeline.id,
+            pipeline.message_processed,
+        )
+        self.register_pipeline_metric(
+            metric_manager,
+            PIPELINE_MESSAGE_PROCESSING_TIME_NAME,
+            pipeline.id,
+            pipeline.message_processing_time,
+        )
+        self.register_pipeline_metric(
+            metric_manager,
+            PIPELINE_PROCESSING_ERRORS_NAME,
+            pipeline.id,
+            pipeline.processing_errors,
+        )
         return pipeline
 
-    def add_function_pipeline(self, pipeline_id: str, topics: list[str],
-                              *transforms: AppFunction) -> Optional[errors.EdgeX]:
+    def add_function_pipeline(
+        self, pipeline_id: str, topics: list[str], *transforms: AppFunction
+    ) -> Optional[errors.EdgeX]:
         """
         add_function_pipeline is thread safe to set transforms
         """
         pipeline = self._pipelines.get(pipeline_id)
         if pipeline is not None:
-            raise errors.new_common_edgex(errors.ErrKind.STATUS_CONFLICT,
-                                           f"pipeline with Id='{pipeline_id}' already exists")
+            raise errors.new_common_edgex(
+                errors.ErrKind.STATUS_CONFLICT,
+                f"pipeline with Id='{pipeline_id}' already exists",
+            )
 
         self._add_function_pipeline(pipeline_id, topics, *transforms)
         return None
 
-    def set_functions_pipeline_transforms(self, pipeline_id: str, *transforms: AppFunction):
+    def set_functions_pipeline_transforms(
+        self, pipeline_id: str, *transforms: AppFunction
+    ):
         """
         set_functions_pipeline_transforms sets the transforms for the pipeline with the provided id
         """
         pipeline = self._pipelines[pipeline_id]
         if pipeline is None:
-            self._logger.warn(f"Unable to set transforms for {pipeline_id} pipeline: Pipeline "
-                              f"not found")
+            self._logger.warn(
+                f"Unable to set transforms for {pipeline_id} pipeline: Pipeline "
+                f"not found"
+            )
             return
         with self.is_busy_copying_lock:
             pipeline.transforms = transforms
@@ -212,8 +259,13 @@ class FunctionsPipelineRuntime:
             try:
                 process_custom_payload(envelope, target)
             except ValueError as e:
-                self._log_error(ValueError(f"unable to process custom object received of type "
-                                           f"'{custom_type_name}': {e}"), envelope.correlationID)
+                self._log_error(
+                    ValueError(
+                        f"unable to process custom object received of type "
+                        f"'{custom_type_name}': {e}"
+                    ),
+                    envelope.correlationID,
+                )
                 return None
 
         ctx.set_correlation_id(envelope.correlationID)
@@ -227,7 +279,9 @@ class FunctionsPipelineRuntime:
         process_event_payload processes the event payload from the message envelope
         """
         try:
-            request_dto = get_msg_payload(payload_with_correct_content_type(envelope), AddEventRequest)
+            request_dto = get_msg_payload(
+                payload_with_correct_content_type(envelope), AddEventRequest
+            )
             event = request_dto.event
 
             if os.getenv(ENV_OPTIMIZE_EVENT_PAYLOAD) == VALUE_TRUE:
@@ -241,19 +295,23 @@ class FunctionsPipelineRuntime:
                         r.resourceName = event.sourceName
 
             return event
-        except Exception as e: # pylint: disable=broad-exception-caught
-            self._logger.debug(f"Failed to process Payload as an AddEventRequest DTO: {e}"
-                               f"Attempting to process Payload as an Event DTO")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            self._logger.debug(
+                f"Failed to process Payload as an AddEventRequest DTO: {e}"
+                f"Attempting to process Payload as an Event DTO"
+            )
         try:
             event = get_msg_payload(payload_with_correct_content_type(envelope), Event)
             return event
         except Exception as e:  # pylint: disable=broad-exception-caught
-            raise errors.new_common_edgex(errors.ErrKind.CONTRACT_INVALID,
-                                          f"failed to decode message envelope into "
-                                          f"Event DTO: {e}")
+            raise errors.new_common_edgex(
+                errors.ErrKind.CONTRACT_INVALID,
+                f"failed to decode message envelope into " f"Event DTO: {e}",
+            )
 
-    def process_message(self, ctx: AppFunctionContext, data: Any, pipeline: FunctionPipeline) -> (
-            MessageError | None):
+    def process_message(
+        self, ctx: AppFunctionContext, data: Any, pipeline: FunctionPipeline
+    ) -> MessageError | None:
         """
         process_message process the decoded data
         """
@@ -264,14 +322,22 @@ class FunctionsPipelineRuntime:
         self._logger.debug(f"Processing message with pipeline: {pipeline.id}")
         ctx.add_value(KEY_PIPELINEID, pipeline.id)
 
-        self._logger.debug(f"Pipeline {pipeline.id} processing message with "
-                           f"{len(pipeline.transforms)} transforms")
+        self._logger.debug(
+            f"Pipeline {pipeline.id} processing message with "
+            f"{len(pipeline.transforms)} transforms"
+        )
 
         return self.execute_pipeline(ctx, data, pipeline)
 
     # pylint: disable=too-many-arguments, too-many-positional-arguments
-    def execute_pipeline(self, ctx: AppFunctionContext, data: Any, pipeline: FunctionPipeline,
-                         start_position: int = 0, is_retry: bool = False) -> MessageError | None:
+    def execute_pipeline(
+        self,
+        ctx: AppFunctionContext,
+        data: Any,
+        pipeline: FunctionPipeline,
+        start_position: int = 0,
+        is_retry: bool = False,
+    ) -> MessageError | None:
         """
         execute_pipeline executes the pipeline with the provided data
         """
@@ -289,13 +355,16 @@ class FunctionsPipelineRuntime:
 
             if not continue_pipeline:
                 if result is not None and isinstance(result, errors.EdgeX):
-                    self._logger.error(f"Pipeline {pipeline.id} function #{function_index} resulted"
-                                       f" in error: {result.debug_messages()} "
-                                       f"({CORRELATION_HEADER}={ctx.correlation_id()})")
+                    self._logger.error(
+                        f"Pipeline {pipeline.id} function #{function_index} resulted"
+                        f" in error: {result.debug_messages()} "
+                        f"({CORRELATION_HEADER}={ctx.correlation_id()})"
+                    )
                     retry_data = ctx.retry_data()
                     if retry_data is not None and not is_retry:
                         self.store_forward.store_for_later_retry(
-                            retry_data, ctx, pipeline, function_index)
+                            retry_data, ctx, pipeline, function_index
+                        )
                     pipeline.processing_errors.inc(1)
                     return MessageError(result, HTTPStatus.UNPROCESSABLE_ENTITY)
                 break
@@ -308,30 +377,45 @@ class FunctionsPipelineRuntime:
 
     # pylint: disable=too-many-positional-arguments
     def start_store_and_forward(
-            self,
-            app_wg: WaitGroup, app_ctx_done: threading.Event,
-            store_forward_wg: WaitGroup, store_forward_ctx_done: threading.Event,
-            service_key: str):
-        """ start store and forward """
+        self,
+        app_wg: WaitGroup,
+        app_ctx_done: threading.Event,
+        store_forward_wg: WaitGroup,
+        store_forward_ctx_done: threading.Event,
+        service_key: str,
+    ):
+        """start store and forward"""
         self.store_forward.start_store_and_forward_retry_loop(
-            app_wg, app_ctx_done, store_forward_wg, store_forward_ctx_done, service_key)
+            app_wg, app_ctx_done, store_forward_wg, store_forward_ctx_done, service_key
+        )
 
-    def register_pipeline_metric(self, metric_manager: MetricsManager, metric_name: str,
-                                 pipeline_id: str, metric: Any):
+    def register_pipeline_metric(
+        self,
+        metric_manager: MetricsManager,
+        metric_name: str,
+        pipeline_id: str,
+        metric: Any,
+    ):
         """
         Register a metric with the provided name and pipeline id.
         """
         registered_name = metric_name.replace(PIPELINE_ID_TXT, pipeline_id, 1)
         try:
             metric_manager.register(registered_name, metric, {"pipeline": pipeline_id})
-            self._logger.info("%s metric has been registered and will be reported (if enabled)",
-                              metric_name)
+            self._logger.info(
+                "%s metric has been registered and will be reported (if enabled)",
+                metric_name,
+            )
         except errors.EdgeX as e:
-            self._logger.warn("Unable to register %s metric. Metric will not be reported : %s",
-                              registered_name, e)
+            self._logger.warn(
+                "Unable to register %s metric. Metric will not be reported : %s",
+                registered_name,
+                e,
+            )
 
-    def unregister_pipeline_metric(self, metric_manager: MetricsManager, metric_name: str,
-                                   pipeline_id: str):
+    def unregister_pipeline_metric(
+        self, metric_manager: MetricsManager, metric_name: str, pipeline_id: str
+    ):
         """
         Unregister a metric with the provided name and pipeline id.
         """
@@ -347,7 +431,9 @@ def topic_matches(incoming_topic: str, pipeline_topics: list[str]) -> bool:
         if topic == TOPIC_WILDCARD:
             return True
 
-        wildcard_count = topic.count(TOPIC_WILDCARD) + topic.count(TOPIC_SINGLE_LEVEL_WILDCARD)
+        wildcard_count = topic.count(TOPIC_WILDCARD) + topic.count(
+            TOPIC_SINGLE_LEVEL_WILDCARD
+        )
         if wildcard_count == 0:
             if incoming_topic == topic:
                 return True
@@ -372,23 +458,30 @@ def topic_matches(incoming_topic: str, pipeline_topics: list[str]) -> bool:
 
 
 class StoreForwardInfo:
-    """ StoreForwardInfo handle the retry process """
+    """StoreForwardInfo handle the retry process"""
 
     # pylint: disable=too-many-arguments
-    def __init__(self, runtime: FunctionsPipelineRuntime, dic: Container, service_key: str):
+    def __init__(
+        self, runtime: FunctionsPipelineRuntime, dic: Container, service_key: str
+    ):
         self.runtime = runtime
         self.dic = dic
         self.lc = logging_client_from(dic.get)
         self.service_key = service_key
-        self.data_count = Counter("")
+        self.data_count = Counter()
         self.retry_in_progress_lock = threading.Lock()
         self.retry_in_progress = False
 
     # pylint: disable=too-many-positional-arguments
     def start_store_and_forward_retry_loop(
-            self, app_wg: WaitGroup, app_ctx_done: threading.Event,
-            store_forward_wg: WaitGroup, store_forward_ctx_done: threading.Event, service_key: str):
-        """ start a loop for store and forward """
+        self,
+        app_wg: WaitGroup,
+        app_ctx_done: threading.Event,
+        store_forward_wg: WaitGroup,
+        store_forward_ctx_done: threading.Event,
+        service_key: str,
+    ):
+        """start a loop for store and forward"""
 
         app_wg.add(1)
         store_forward_wg.add(1)
@@ -399,8 +492,11 @@ class StoreForwardInfo:
 
         items, err = store_client.retrieve_from_store(service_key)
         if err is not None:
-            self.lc.error("Unable to initialize Store and Forward data count: "
-                          "Failed to load items from DB: %v", err)
+            self.lc.error(
+                "Unable to initialize Store and Forward data count: "
+                "Failed to load items from DB: %v",
+                err,
+            )
         else:
             self.data_count.clear()
             self.data_count.inc(len(items))
@@ -408,23 +504,26 @@ class StoreForwardInfo:
         def retry_loop():
             try:
                 retry_interval_duration = isodate.parse_duration(
-                    "PT" + config.Writable.StoreAndForward.RetryInterval.upper())
+                    "PT" + config.Writable.StoreAndForward.RetryInterval.upper()
+                )
                 retry_interval = retry_interval_duration.seconds
             except ISO8601Error as e:
-                self.lc.warn(
-                    "StoreAndForward RetryInterval failed to parse, %s",
-                    e)
+                self.lc.warn("StoreAndForward RetryInterval failed to parse, %s", e)
                 retry_interval = DEFAULT_MIN_RETRY_INTERVAL
 
             if retry_interval < DEFAULT_MIN_RETRY_INTERVAL:
                 self.lc.warn(
                     "StoreAndForward RetryInterval value %s is less than the allowed minimum value,"
-                    " defaulting to %s seconds", retry_interval, DEFAULT_MIN_RETRY_INTERVAL)
+                    " defaulting to %s seconds",
+                    retry_interval,
+                    DEFAULT_MIN_RETRY_INTERVAL,
+                )
 
             if config.Writable.StoreAndForward.MaxRetryCount < 0:
                 self.lc.warn(
                     "StoreAndForward MaxRetryCount can not be less than 0, "
-                    "defaulting to 1 seconds")
+                    "defaulting to 1 seconds"
+                )
                 config.Writable.StoreAndForward.MaxRetryCount = 1
 
             self.lc.info(
@@ -432,7 +531,8 @@ class StoreForwardInfo:
                 "and %d max retries. %d stored items waiting for retry.",
                 retry_interval,
                 config.Writable.StoreAndForward.MaxRetryCount,
-                len(items))
+                len(items),
+            )
 
             start_time = time.time()
             next_time = start_time + retry_interval
@@ -454,40 +554,53 @@ class StoreForwardInfo:
         threading.Thread(target=retry_loop).start()
 
     def store_for_later_retry(
-            self,
-            payload: bytes,
-            app_context: AppFunctionContext,
-            pipeline: FunctionPipeline,
-            pipeline_position: int):
-        """ store data for later retry """
+        self,
+        payload: bytes,
+        app_context: AppFunctionContext,
+        pipeline: FunctionPipeline,
+        pipeline_position: int,
+    ):
+        """store data for later retry"""
 
-        item = new_stored_object(self.service_key, payload, pipeline.id,
-                                 pipeline_position, pipeline.hash,
-                                 app_context.get_values())
+        item = new_stored_object(
+            self.service_key,
+            payload,
+            pipeline.id,
+            pipeline_position,
+            pipeline.hash,
+            app_context.get_values(),
+        )
         item.correlationID = app_context.correlation_id()
 
-        self.lc.trace("Storing data for later retry for pipeline '%s' (%s=%s)",
-                      pipeline.id,
-                      constants.CORRELATION_HEADER,
-                      app_context.correlation_id())
+        self.lc.trace(
+            "Storing data for later retry for pipeline '%s' (%s=%s)",
+            pipeline.id,
+            constants.CORRELATION_HEADER,
+            app_context.correlation_id(),
+        )
 
         config = configuration_from(self.dic.get)
         if not config.Writable.StoreAndForward.Enabled:
-            self.lc.error("Failed to store item for later retry for "
-                          "pipeline '%s': StoreAndForward not enabled",
-                          pipeline.id)
+            self.lc.error(
+                "Failed to store item for later retry for "
+                "pipeline '%s': StoreAndForward not enabled",
+                pipeline.id,
+            )
             return
 
         store_client = store_client_from(self.dic.get)
         _, err = store_client.store(item)
         if err is not None:
             self.lc.error(
-                "Failed to store item for later retry for pipeline '%s': %s", pipeline.id, err)
+                "Failed to store item for later retry for pipeline '%s': %s",
+                pipeline.id,
+                err,
+            )
 
         self.data_count.inc(1)
 
     def retry_stored_data(self, service_key: str):
-        """ Skip if another thread is already doing the retry """
+        """Skip if another thread is already doing the retry"""
         if self.retry_in_progress:
             return
 
@@ -499,7 +612,9 @@ class StoreForwardInfo:
 
                 items, err = store_client.retrieve_from_store(service_key)
                 if err is not None:
-                    self.lc.error("Unable to load store and forward items from DB: %s", err)
+                    self.lc.error(
+                        "Unable to load store and forward items from DB: %s", err
+                    )
                     return
 
                 self.lc.debug("%d stored data items found for retrying", len(items))
@@ -508,9 +623,13 @@ class StoreForwardInfo:
                     items_to_remove, items_to_update = self.process_retry_items(items)
 
                     self.lc.debug(
-                        " %d stored data items will be removed post retry", len(items_to_remove))
+                        " %d stored data items will be removed post retry",
+                        len(items_to_remove),
+                    )
                     self.lc.debug(
-                        " %d stored data items will be updated post retry", len(items_to_update))
+                        " %d stored data items will be updated post retry",
+                        len(items_to_update),
+                    )
 
                     for item in items_to_remove:
                         err = store_client.remove_from_store(item)
@@ -518,7 +637,10 @@ class StoreForwardInfo:
                             self.lc.error(
                                 "Unable to remove stored data item for "
                                 "pipeline '%s' from DB, objectID=%s: %s",
-                                item.pipelineId, err, item.id)
+                                item.pipelineId,
+                                err,
+                                item.id,
+                            )
 
                     for item in items_to_update:
                         err = store_client.update(item)
@@ -526,15 +648,19 @@ class StoreForwardInfo:
                             self.lc.error(
                                 "Unable to update stored data item for "
                                 "pipeline '%s' from DB, objectID=%s: %s",
-                                item.pipelineId, err, item.id)
+                                item.pipelineId,
+                                err,
+                                item.id,
+                            )
 
                     self.data_count.dec(len(items_to_remove))
             finally:
                 self.retry_in_progress = False
 
     def process_retry_items(
-            self, items: list[StoredObject]) -> Tuple[list[StoredObject], list[StoredObject]]:
-        """ process the retry items """
+        self, items: list[StoredObject]
+    ) -> Tuple[list[StoredObject], list[StoredObject]]:
+        """process the retry items"""
         config = configuration_from(self.dic.get)
 
         items_to_remove: list[StoredObject] = []
@@ -552,7 +678,8 @@ class StoreForwardInfo:
             if pipeline is None:
                 self.lc.error(
                     "Stored data item's pipeline '%s' no longer exists. Removing item from DB",
-                    item.pipelineId)
+                    item.pipelineId,
+                )
                 items_to_remove.append(item)
                 continue
 
@@ -560,7 +687,8 @@ class StoreForwardInfo:
                 self.lc.error(
                     "Stored data item's pipeline Version doesn't match '%s' pipeline's Version. "
                     "Removing item from DB",
-                    item.pipelineId)
+                    item.pipelineId,
+                )
                 items_to_remove.append(item)
                 continue
 
@@ -573,7 +701,8 @@ class StoreForwardInfo:
                         item.pipelineId,
                         item.retryCount,
                         CORRELATION_HEADER,
-                        item.correlationID)
+                        item.correlationID,
+                    )
                     items_to_update.append(item)
                     continue
 
@@ -583,45 +712,53 @@ class StoreForwardInfo:
                     item.pipelineId,
                     item.retryCount,
                     CORRELATION_HEADER,
-                    item.correlationID)
+                    item.correlationID,
+                )
                 items_to_remove.append(item)
 
                 # Note that item will be removed for DB below.
             else:
-                self.lc.trace("Retry successful for pipeline '%s'. Removing item from DB (%s=%s)",
-                              item.pipelineId,
-                              CORRELATION_HEADER,
-                              item.correlationID)
+                self.lc.trace(
+                    "Retry successful for pipeline '%s'. Removing item from DB (%s=%s)",
+                    item.pipelineId,
+                    CORRELATION_HEADER,
+                    item.correlationID,
+                )
                 items_to_remove.append(item)
 
         return items_to_remove, items_to_update
 
-    def retry_export_function(self, item: StoredObject, pipeline: FunctionPipeline) -> bool:
-        """ retry the export function """
+    def retry_export_function(
+        self, item: StoredObject, pipeline: FunctionPipeline
+    ) -> bool:
+        """retry the export function"""
         app_context = Context(item.correlationID, self.dic, "")
 
         for k, v in item.contextData.items():
             app_context.add_value(k.lower(), v)
 
-        self.lc.trace("Retrying stored data for pipeline '%s' (%s=%s)",
-                      item.pipelineId,
-                      CORRELATION_HEADER,
-                      app_context.correlation_id())
+        self.lc.trace(
+            "Retrying stored data for pipeline '%s' (%s=%s)",
+            item.pipelineId,
+            CORRELATION_HEADER,
+            app_context.correlation_id(),
+        )
 
-        return self.runtime.execute_pipeline(
-            app_context,
-            item.payload,
-            pipeline,
-            item.pipelinePosition,
-            True) is None
+        return (
+            self.runtime.execute_pipeline(
+                app_context, item.payload, pipeline, item.pipelinePosition, True
+            )
+            is None
+        )
 
     def trigger_retry(self):
-        """ trigger the retry process """
+        """trigger the retry process"""
         if self.data_count.counter > 0:
             config = configuration_from(self.dic.get)
             if not config.Writable.StoreAndForward.Enabled:
                 self.lc.debug(
-                    "Store and Forward not enabled, skipping triggering retry of failed data")
+                    "Store and Forward not enabled, skipping triggering retry of failed data"
+                )
                 return
 
             self.lc.debug("Triggering Store and Forward retry of failed data")
@@ -629,8 +766,9 @@ class StoreForwardInfo:
 
 
 def new_store_and_forward(
-        runtime: FunctionsPipelineRuntime, dic: Container, service_key: str) -> StoreForwardInfo:
-    """ creates new StoreForward """
+    runtime: FunctionsPipelineRuntime, dic: Container, service_key: str
+) -> StoreForwardInfo:
+    """creates new StoreForward"""
     sf = StoreForwardInfo(
         runtime=runtime,
         dic=dic,
@@ -639,17 +777,24 @@ def new_store_and_forward(
     lc = logging_client_from(dic.get)
     metrics_manager = metrics_manager_from(dic.get)
     if metrics_manager is None:
-        lc.error("Unable to register %s metric: MetricsManager is not available.",
-                 STORE_FORWARD_QUEUE_SIZE_NAME)
+        lc.error(
+            "Unable to register %s metric: MetricsManager is not available.",
+            STORE_FORWARD_QUEUE_SIZE_NAME,
+        )
         return sf
 
     try:
         metrics_manager.register(STORE_FORWARD_QUEUE_SIZE_NAME, sf.data_count, None)
-        lc.info("%s metric has been registered and will be reported (if enabled)",
-                STORE_FORWARD_QUEUE_SIZE_NAME)
+        lc.info(
+            "%s metric has been registered and will be reported (if enabled)",
+            STORE_FORWARD_QUEUE_SIZE_NAME,
+        )
     except errors.EdgeX as e:
-        lc.error("Unable to register metric %s. Collection will continue, "
-                 "but metric will not be reported: %v",
-                 STORE_FORWARD_QUEUE_SIZE_NAME, e)
+        lc.error(
+            "Unable to register metric %s. Collection will continue, "
+            "but metric will not be reported: %v",
+            STORE_FORWARD_QUEUE_SIZE_NAME,
+            e,
+        )
 
     return sf

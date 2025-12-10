@@ -9,14 +9,20 @@ import requests
 from pyformance import meters
 
 from .helpers import register_metric
-from .string_values_formatter import StringValuesFormatter, default_string_value_formatter
+from .string_values_formatter import (
+    StringValuesFormatter,
+    default_string_value_formatter,
+)
 from ..bootstrap.metrics.samples import UniformSample
 from ..contracts.clients.utils.request import HTTPMethod
 from ..contracts import errors
 from ..contracts.common.constants import CORRELATION_HEADER, CONTENT_TYPE_JSON
 from ..interfaces import AppFunctionContext
-from ..internal.constants import (METRICS_RESERVOIR_SIZE, HTTP_EXPORT_ERRORS_NAME,
-                                  HTTP_EXPORT_SIZE_NAME)
+from ..internal.constants import (
+    METRICS_RESERVOIR_SIZE,
+    HTTP_EXPORT_ERRORS_NAME,
+    HTTP_EXPORT_SIZE_NAME,
+)
 from ..utils.helper import coerce_type
 
 EXPORT_METHOD = "method"
@@ -37,14 +43,21 @@ class HTTPSender:
     # pylint: disable=too-many-instance-attributes
     # pylint: disable=too-many-arguments
     # pylint: disable=too-many-positional-arguments
-    """ HTTPSender is used to post or put the HTTP request """
+    """HTTPSender is used to post or put the HTTP request"""
 
-    def __init__(self, url: str, mime_type: str, persist_on_error: bool,
-                 continue_on_send_error: bool, return_input_data: bool,
-                 http_header_name: str, secret_value_key: str,
-                 secret_name: str,
-                 url_formatter: StringValuesFormatter = default_string_value_formatter,
-                 http_request_headers=None):
+    def __init__(
+        self,
+        url: str,
+        mime_type: str,
+        persist_on_error: bool,
+        continue_on_send_error: bool,
+        return_input_data: bool,
+        http_header_name: str,
+        secret_value_key: str,
+        secret_name: str,
+        url_formatter: StringValuesFormatter = default_string_value_formatter,
+        http_request_headers=None,
+    ):
         if http_request_headers is None:
             http_request_headers = {}
         self.url = url
@@ -57,17 +70,20 @@ class HTTPSender:
         self.secret_name = secret_name
         self.url_formatter = url_formatter
         self.http_request_headers = http_request_headers
-        self.http_error_metrics = meters.Counter("")
-        self.http_size_metrics = meters.Histogram("", sample=UniformSample(METRICS_RESERVOIR_SIZE))
+        self.http_error_metrics = meters.Counter()
+        self.http_size_metrics = meters.Histogram(
+            sample=UniformSample(METRICS_RESERVOIR_SIZE)
+        )
 
     def set_retry_data(self, ctx: AppFunctionContext, export_data: bytes):
-        """ set retry data in app function context """
+        """set retry data in app function context"""
         if self.persist_on_error:
             ctx.set_retry_data(export_data)
 
     def determine_if_using_secrets(
-            self, ctx: AppFunctionContext) -> Tuple[bool, Optional[errors.EdgeX]]:
-        """ determine if using secrets """
+        self, ctx: AppFunctionContext
+    ) -> Tuple[bool, Optional[errors.EdgeX]]:
+        """determine if using secrets"""
         # not using secrets if both are empty
         if len(self.secret_name) == 0 and len(self.secret_value_key) == 0:
             if len(self.http_header_name) == 0:
@@ -76,34 +92,40 @@ class HTTPSender:
             return False, errors.new_common_edgex(
                 errors.ErrKind.CONTRACT_INVALID,
                 f"in pipeline '{ctx.pipeline_id()}', "
-                f"secretName & secretValueKey must be specified when HTTP Header Name is specified")
+                f"secretName & secretValueKey must be specified when HTTP Header Name is specified",
+            )
 
         # check if one field but not others are provided for secrets
         if len(self.secret_value_key) == 0:
             return False, errors.new_common_edgex(
                 errors.ErrKind.CONTRACT_INVALID,
                 f"in pipeline '{ctx.pipeline_id()}', "
-                f"secretName was specified but no secretName was provided")
+                f"secretName was specified but no secretName was provided",
+            )
 
         if len(self.secret_name) == 0:
             return False, errors.new_common_edgex(
                 errors.ErrKind.CONTRACT_INVALID,
                 f"in pipeline '{ctx.pipeline_id()}', "
-                f"HTTP Header secretName was provided but no secretName was provided")
+                f"HTTP Header secretName was provided but no secretName was provided",
+            )
 
         if len(self.http_header_name) == 0:
             return False, errors.new_common_edgex(
                 errors.ErrKind.CONTRACT_INVALID,
-                f"in pipeline '{ctx.pipeline_id()}', HTTP Header Name required when using secrets")
+                f"in pipeline '{ctx.pipeline_id()}', HTTP Header Name required when using secrets",
+            )
 
         # using secrets, all required fields are provided
         return True, None
 
-    def http_send(self, ctx: AppFunctionContext, data: Any, method: str) -> Tuple[bool, Any]:
+    def http_send(
+        self, ctx: AppFunctionContext, data: Any, method: str
+    ) -> Tuple[bool, Any]:
         # pylint: disable=too-many-locals
         # pylint: disable=too-many-return-statements
         # pylint: disable=too-many-branches
-        """ util function to send the http request """
+        """util function to send the http request"""
         lc = ctx.logger()
 
         lc.debug(f"HTTP Exporting in pipeline '{ctx.pipeline_id()}'")
@@ -112,19 +134,22 @@ class HTTPSender:
             # We didn't receive a result
             return False, errors.new_common_edgex(
                 errors.ErrKind.CONTRACT_INVALID,
-                f"function HTTP{method} in pipeline '{ctx.pipeline_id()}': No Data Received")
+                f"function HTTP{method} in pipeline '{ctx.pipeline_id()}': No Data Received",
+            )
 
         if self.persist_on_error and self.continue_on_send_error:
             return False, errors.new_common_edgex(
                 errors.ErrKind.CONTRACT_INVALID,
                 f"in pipeline '{ctx.pipeline_id()}' persist_on_error & "
-                f"continue_on_send_error can not both be set to true for HTTP Export")
+                f"continue_on_send_error can not both be set to true for HTTP Export",
+            )
 
         if self.continue_on_send_error and not self.return_input_data:
             return False, errors.new_common_edgex(
                 errors.ErrKind.CONTRACT_INVALID,
                 f"in pipeline '{ctx.pipeline_id()}' continueOnSendError "
-                f"can only be used in conjunction returnInputData for multiple HTTP Export")
+                f"can only be used in conjunction returnInputData for multiple HTTP Export",
+            )
 
         if self.mime_type == "":
             self.mime_type = CONTENT_TYPE_JSON
@@ -144,14 +169,22 @@ class HTTPSender:
         except TypeError as e:
             return False, errors.new_common_edgex(
                 errors.ErrKind.CONTRACT_INVALID,
-                f"failed to parse the formatted url '{formatted_url}'", e)
+                f"failed to parse the formatted url '{formatted_url}'",
+                e,
+            )
 
-        register_metric(ctx, lambda: f"{HTTP_EXPORT_ERRORS_NAME}-{parsed_url.geturl()}",
-                        lambda: self.http_error_metrics,
-                        {"url": parsed_url.geturl()})
-        register_metric(ctx, lambda: f"{HTTP_EXPORT_SIZE_NAME}-{parsed_url.geturl()}",
-                        lambda: self.http_size_metrics,
-                        {"url": parsed_url.geturl()})
+        register_metric(
+            ctx,
+            lambda: f"{HTTP_EXPORT_ERRORS_NAME}-{parsed_url.geturl()}",
+            lambda: self.http_error_metrics,
+            {"url": parsed_url.geturl()},
+        )
+        register_metric(
+            ctx,
+            lambda: f"{HTTP_EXPORT_SIZE_NAME}-{parsed_url.geturl()}",
+            lambda: self.http_size_metrics,
+            {"url": parsed_url.geturl()},
+        )
 
         req = requests.Request(method, parsed_url.geturl(), data=export_data)
 
@@ -161,10 +194,13 @@ class HTTPSender:
             # the_secrets = ctx.SecretProvider().GetSecret(sender.secretName, sender.secretValueKey)
 
             lc.debug(
-                (f"Setting HTTP Header '{self.http_header_name}' with secret value "
-                 f"from SecretStore at secretName='{self.secret_name}' "
-                 f"& secretValueKey='{self.secret_value_key}' "
-                 f"in pipeline '{ctx.pipeline_id()}'"))
+                (
+                    f"Setting HTTP Header '{self.http_header_name}' with secret value "
+                    f"from SecretStore at secretName='{self.secret_name}' "
+                    f"& secretValueKey='{self.secret_value_key}' "
+                    f"in pipeline '{ctx.pipeline_id()}'"
+                )
+            )
 
             req.headers[self.http_header_name] = the_secrets[self.secret_value_key]
 
@@ -174,8 +210,10 @@ class HTTPSender:
         for key, element in self.http_request_headers.items():
             req.headers[key] = element
 
-        lc.debug(f"POSTing data to {parsed_url.geturl()} {parsed_url.path} "
-                 f"in pipeline '{ctx.pipeline_id()}'")
+        lc.debug(
+            f"POSTing data to {parsed_url.geturl()} {parsed_url.path} "
+            f"in pipeline '{ctx.pipeline_id()}'"
+        )
 
         with requests.Session() as s:
             try:
@@ -193,10 +231,12 @@ class HTTPSender:
 
                 lc.debug(
                     f"Sent {export_data_bytes} bytes of data "
-                    f"in pipeline '{ctx.pipeline_id()}'. Response status is {response.status_code}")
+                    f"in pipeline '{ctx.pipeline_id()}'. Response status is {response.status_code}"
+                )
                 lc.trace(
                     f"Data exported for pipeline "
-                    f"'{ctx.pipeline_id()}' ({CORRELATION_HEADER}={ctx.correlation_id()})")
+                    f"'{ctx.pipeline_id()}' ({CORRELATION_HEADER}={ctx.correlation_id()})"
+                )
 
                 # This allows multiple HTTP Exports to be chained in the pipeline
                 # to send the same data to different destinations
@@ -211,7 +251,9 @@ class HTTPSender:
                 # Continuing pipeline on error
                 # This is in support of sending to multiple export destinations
                 # by chaining export functions in the pipeline.
-                lc.error(f"Continuing pipeline on error in pipeline '{ctx.pipeline_id()}': {e}")
+                lc.error(
+                    f"Continuing pipeline on error in pipeline '{ctx.pipeline_id()}': {e}"
+                )
 
                 # If continuing on send error then can't be persisting on error since Store
                 # and Forward retries starting with the function that failed and
@@ -224,7 +266,7 @@ class HTTPSender:
                 return True, data
 
     def set_http_request_headers(self, http_request_headers: dict):
-        """ SetHttpRequestHeaders will set all the header parameters for the http request """
+        """SetHttpRequestHeaders will set all the header parameters for the http request"""
         if http_request_headers is not None:
             self.http_request_headers = http_request_headers
 
@@ -232,14 +274,14 @@ class HTTPSender:
         """
         HTTPPost will send data from the previous function to the specified Endpoint via http POST.
         If no previous function exists, then the event that triggered the pipeline will be used.
-        An empty string for the mimetype will default to application/json. """
+        An empty string for the mimetype will default to application/json."""
         return self.http_send(ctx, data, HTTPMethod.POST.value)
 
     def http_put(self, ctx: AppFunctionContext, data: Any) -> Tuple[bool, Any]:
         """
         http_put will send data from the previous function to the specified Endpoint via http PUT.
         If no previous function exists, then the event that triggered the pipeline will be used.
-        An empty string for the mimetype will default to application/json. """
+        An empty string for the mimetype will default to application/json."""
         return self.http_send(ctx, data, HTTPMethod.PUT.value)
 
 
@@ -248,13 +290,20 @@ class HTTPSenderOptions:
     # pylint: disable=too-few-public-methods
     # pylint: disable=too-many-instance-attributes
     # pylint: disable=too-many-positional-arguments
-    """ HTTPSenderOptions is used hold the HTTP request configuration """
+    """HTTPSenderOptions is used hold the HTTP request configuration"""
 
-    def __init__(self, url: str = "", mime_type: str = "", persist_on_error: bool = False,
-                 http_header_name: str = "", secret_name: str = "",
-                 secret_value_key: str = "",
-                 url_formatter: StringValuesFormatter = default_string_value_formatter,
-                 continue_on_send_error: bool = False, return_input_data: bool = False):
+    def __init__(
+        self,
+        url: str = "",
+        mime_type: str = "",
+        persist_on_error: bool = False,
+        http_header_name: str = "",
+        secret_name: str = "",
+        secret_value_key: str = "",
+        url_formatter: StringValuesFormatter = default_string_value_formatter,
+        continue_on_send_error: bool = False,
+        return_input_data: bool = False,
+    ):
         # url specifies the URL of destination
         self.url = url
         # mime_type specifies MimeType to send to destination
@@ -270,7 +319,9 @@ class HTTPSenderOptions:
         # url_formatter specifies custom formatting behavior to be applied to configured URL.
         # If nothing specified, default behavior is to attempt to replace placeholders in the
         # form '{some-context-key}' with the values found in the context storage.
-        self.url_formatter = url_formatter  # Assuming StringValuesFormatter is defined elsewhere
+        self.url_formatter = (
+            url_formatter  # Assuming StringValuesFormatter is defined elsewhere
+        )
         # continue_on_send_error allows execution of subsequent chained senders after errors if true
         self.continue_on_send_error = continue_on_send_error
         # return_input_data enables chaining multiple HTTP senders if true
@@ -278,17 +329,17 @@ class HTTPSenderOptions:
 
 
 def new_http_sender(url: str, mime_type: str, persist_on_error: bool) -> HTTPSender:
-    """ new_http_sender creates, initializes and returns a new instance of HTTPSender """
-    return new_http_sender_with_options(HTTPSenderOptions(
-        url=url,
-        mime_type=mime_type,
-        persist_on_error=persist_on_error
-    ))
+    """new_http_sender creates, initializes and returns a new instance of HTTPSender"""
+    return new_http_sender_with_options(
+        HTTPSenderOptions(
+            url=url, mime_type=mime_type, persist_on_error=persist_on_error
+        )
+    )
 
 
 def new_http_sender_with_options(options: HTTPSenderOptions) -> HTTPSender:
-    """ new_http_sender_with_options creates, initializes and returns a new instance of HTTPSender
-     configured with provided options """
+    """new_http_sender_with_options creates, initializes and returns a new instance of HTTPSender
+    configured with provided options"""
     return HTTPSender(
         url=options.url,
         mime_type=options.mime_type,
@@ -298,5 +349,5 @@ def new_http_sender_with_options(options: HTTPSenderOptions) -> HTTPSender:
         http_header_name=options.http_header_name,
         secret_value_key=options.secret_value_key,
         secret_name=options.secret_name,
-        url_formatter=options.url_formatter
+        url_formatter=options.url_formatter,
     )

@@ -38,24 +38,20 @@ class DeletableMetricsRegistry(MetricsRegistry):
             del self._gauges[metric_key]
         if metric_key in self._meters:
             del self._meters[metric_key]
-        if metric_key in self._events:
-            del self._events[metric_key]
 
     def all_metrics(self) -> Dict[str, Any]:
         """Get all metrics in the registry."""
         metrics = {}
         for base_metric, metric in self._histograms.items():
-            metrics[base_metric.key] = metric
+            metrics[base_metric] = metric
         for base_metric, metric in self._timers.items():
-            metrics[base_metric.key] = metric
+            metrics[base_metric] = metric
         for base_metric, metric in self._counters.items():
-            metrics[base_metric.key] = metric
+            metrics[base_metric] = metric
         for base_metric, metric in self._gauges.items():
-            metrics[base_metric.key] = metric
+            metrics[base_metric] = metric
         for base_metric, metric in self._meters.items():
-            metrics[base_metric.key] = metric
-        for base_metric, metric in self._events.items():
-            metrics[base_metric.key] = metric
+            metrics[base_metric] = metric
         return metrics
 
     # pylint: disable=too-many-return-statements
@@ -72,6 +68,4 @@ class DeletableMetricsRegistry(MetricsRegistry):
             return self._gauges[metric_key]
         if metric_key in self._meters:
             return self._meters[metric_key]
-        if metric_key in self._events:
-            return self._events[metric_key]
         return None
