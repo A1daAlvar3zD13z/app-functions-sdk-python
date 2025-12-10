@@ -89,3 +89,8 @@ fabric.properties
 # Custom for repo:
 data/*
 notebooks/data/*
+
+
+# Ignore cache files
+__pycache__/
+src/app_functions_sdk_py.egg-info
